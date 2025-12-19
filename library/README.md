@@ -1,36 +1,54 @@
-# Library Management System – Low Level Design (Correct & Complete)
+# Library Management System – Low Level Design (LLD)
 
-> **A hands-on LLD project to master Core Java, OOP, Collections, DSA-in-design, and clean system modeling**
+> **A rigorous, interview-oriented Low Level Design project built using Core Java, OOP principles, and deliberate data structure choices.**
+
+**This project focuses on how to think like a software engineer during LLD, not just how to write code.**
 
 ---
 
-## 📋 Table of Contents
-- [Problem Statement](#problem-statement)
-- [Functional Requirements](#functional-requirements)
-- [Non-Functional Requirements](#non-functional-requirements)
-- [Assumptions](#assumptions)
-- [Entity Identification](#entity-identification)
-- [Class Responsibilities](#class-responsibilities)
-- [Data Structure Selection](#data-structure-selection)
-- [Design Patterns](#design-patterns)
-- [Edge Cases & Exception Handling](#edge-cases--exception-handling)
-- [Implementation Guide](#implementation-guide)
-- [Future Extensions](#future-extensions)
+## 📌 Project Scope
+
+| Aspect | Detail |
+|--------|--------|
+| **Type** | In-memory, console-based system |
+| **Language** | Java |
+| **Focus** | Low Level Design, object modeling, responsibility separation |
+| **Storage** | In-memory only |
+| **Concurrency** | Single-threaded |
+
+### 🚫 This is NOT a CRUD application
+### ✅ This is a domain-driven, object-oriented system
 
 ---
 
 ## 🎯 Problem Statement
 
-Design and implement an **in-memory, console-based Library Management System** in Java that manages books, users, and borrowing operations while enforcing strict domain rules and state consistency.
+Design and implement an in-memory Library Management System that allows:
 
-### This system must:
-- Model real-world library entities correctly
+- Managing books and their physical copies
+- Registering users
+- Borrowing and returning books
+- Enforcing strict business rules
+- Maintaining consistent state at all times
+
+### The design must:
+- Reflect real-world library behavior
 - Prevent invalid operations by design
-- Maintain strong consistency at all times
-- Be extensible without rewriting core logic
+- Be extensible without breaking existing code
+- Clearly separate who owns what responsibility
 
-### 🚫 This is NOT a CRUD demo
-### ✅ This is a domain-driven, object-oriented LLD system
+---
+
+## ❌ Explicit Non-Goals
+
+To keep the design clean and interview-ready, the system does **NOT** include:
+
+- UI / GUI / Web APIs
+- Database or file persistence
+- Authentication / authorization
+- Concurrency or multi-threading
+- Sensors, scanners, or hardware integration
+- Fine calculation or due-date logic (future extension)
 
 ---
 
@@ -38,34 +56,33 @@ Design and implement an **in-memory, console-based Library Management System** i
 
 ### A. Book Management
 
-1. **Add a book** (metadata) with one or more physical copies
-2. **Remove a book** only if no copies are currently issued
-3. **Search books by**:
-   - Book ID
-   - Title
-   - Author
-4. **View**:
+1. **Add a book** with immutable metadata
+2. **Add multiple physical copies** of a book
+3. **Remove a book** only if no copies are issued
+4. **Track**:
    - Total copies
    - Available copies
    - Issued copies
 
 ### B. User Management
 
-5. **Register a user** with a unique ID and user type
-6. **View books** currently issued to a user
+5. **Register a user** with a unique ID and name
+6. **Track which book copies** a user has borrowed
+7. **Enforce a maximum borrow limit** per user
 
-### C. Core Operations
+### C. Borrow & Return (Core Logic)
 
-7. **Issue Book**:
-   - Validate book existence
-   - Validate availability of at least one copy
-   - Validate user borrowing eligibility
+8. **Borrow a book**:
+   - Validate user exists
+   - Validate book exists
+   - Validate availability
    - Allocate exactly one copy
+   - Update user + inventory consistently
 
-8. **Return Book**:
-   - Validate user–copy association
-   - Restore copy availability
-   - Close issue transaction
+9. **Return a book**:
+   - Validate user–copy relationship
+   - Restore availability
+   - Prevent invalid returns
 
 ---
 
@@ -73,11 +90,10 @@ Design and implement an **in-memory, console-based Library Management System** i
 
 | Category | Requirement |
 |----------|-------------|
-| **Performance** | O(1) lookup for users, books, and issue records |
-| **Consistency** | No partial updates (atomic issue/return) |
-| **Concurrency** | Single-threaded |
-| **Persistence** | In-memory only |
-| **Extensibility** | Easy to add policies, fines, reservations |
+| **Performance** | O(1) lookup for users and books |
+| **Consistency** | No partial updates |
+| **Atomicity** | Borrow / return is all-or-nothing |
+| **Extensibility** | Easy to add policies later |
 | **Maintainability** | SRP, no god classes |
 
 ---
@@ -85,160 +101,150 @@ Design and implement an **in-memory, console-based Library Management System** i
 ## 📝 Assumptions
 
 1. Single library instance
-2. In-memory, single-process system
-3. **Book ≠ BookCopy** (Critical distinction)
-4. Books are issued at **copy level**
-5. User types are finite (STUDENT, FACULTY)
-6. Borrow limits depend on user type (not hardcoded)
-7. No due dates, fines, or reservations initially
-8. Fail-fast behavior on invalid operations
-9. Immediate consistency (no async behavior)
+2. In-memory system
+3. Book metadata is **immutable**
+4. **Book ≠ BookCopy** (critical distinction)
+5. Books are issued at **copy level**
+6. Max borrow limit = **5** (current phase)
+7. Fail-fast behavior for invalid operations
+8. Immediate consistency (no async behavior)
 
 ---
 
 ## 🧩 Entity Identification
 
-| Entity | Purpose |
-|--------|---------|
-| **Book** | Immutable metadata (title, author) |
+| Entity | Description |
+|--------|-------------|
+| **Book** | Immutable metadata |
 | **BookCopy** | Physical copy with state |
 | **User** | Library member |
-| **BookIssueRecord** | Issue–return transaction |
-| **Library** | Aggregate root |
+| **BookInventory** | Manages books and copies |
+| **Library** | Orchestrator (aggregate root) |
 
 ---
 
-## 🏗️ Class Responsibilities
-
-### `Library` (Aggregate Root)
-- **Responsibility**: Orchestrates all operations
-- **Key Concepts**: Transaction management, consistency enforcement
-- **Owns**: All registries and policies
-- **Does NOT**: Hold domain state directly (delegates to registries)
+## 🏗️ Class Responsibilities (As Implemented)
 
 ### `Book`
-- **Responsibility**: Immutable metadata
-- **Key Concepts**: Value object, Encapsulation
+- **Responsibility**: Immutable value object holding metadata
+- **Key Principles**: Encapsulation, Immutability, Identity correctness
 - **Fields**: `bookId`, `title`, `author`, `isbn`
-- **Does NOT**: Track availability or copies
+- **Does NOT**: Track inventory, state, or availability
+- **Identity**: Based on `bookId` (proper `equals()` / `hashCode()`)
 
 ### `BookCopy`
-- **Responsibility**: Physical copy with state management
-- **Key Concepts**: State machine, Encapsulation
+- **Responsibility**: Represents one physical instance with state
+- **Key Principles**: State management, Encapsulation
 - **Fields**: `copyId`, `bookId`, `status` (Enum: AVAILABLE, ISSUED)
-- **Operations**: `issue()`, `returnCopy()` with state validation
-- **Enforces**: Valid state transitions only
+- **Operations**: `issue()`, `returnCopy()` with state transition validation
+- **Why this exists**:
+  - Multiple copies of same book behave independently
+  - Issue/return happens at **copy level**
+  - Each copy has its own lifecycle
+
+### `BookInventory` (Aggregate Root)
+- **Responsibility**: Owns all books and all copies
+- **Key Principles**: Aggregate pattern, Consistency guardian
+- **Owns**:
+  - Book registry
+  - All physical copies
+  - Availability tracking
+- **Operations**:
+  - `addBook()`, `addCopies()`, `removeBook()`
+  - `allocateCopy()` - allocates one available copy
+  - `releaseCopy()` - returns copy to available pool
+  - Prevents illegal removals (issued copies)
+- **Does NOT**:
+  - Know about users
+  - Handle business workflows directly
 
 ### `User`
-- **Responsibility**: Holds user data and tracks issued books
-- **Key Concepts**: Encapsulation, Collections
-- **Fields**: `userId`, `name`, `userType` (Enum), `issuedBooks` (Set<String>)
-- **Operations**: `addIssuedBook()`, `removeIssuedBook()`, `getIssuedCount()`
-- **Does NOT**: Contain borrowing rules logic
-
-### `BorrowPolicy` (Interface) ⭐
-- **Responsibility**: Determines borrowing eligibility
-- **Key Concepts**: Strategy Pattern, OCP
-- **Method**: `canBorrow(User user)` → boolean
-- **Implementations**:
-  - `StudentBorrowPolicy` (max 5 books)
-  - `FacultyBorrowPolicy` (max 10 books)
-
-### `BookInventory` (Registry)
-- **Responsibility**: Manages book catalog and copies
-- **Key Concepts**: SRP, Data ownership
+- **Responsibility**: Tracks borrowed copies and enforces limits
+- **Key Principles**: Encapsulation, SRP
+- **Fields**: `userId`, `name`, `borrowedCopies` (HashSet<BookCopy>)
 - **Operations**: 
-  - `addBook()`, `removeBook()`
-  - `getAvailableCopies()`, `allocateCopy()`, `releaseCopy()`
+  - `borrowCopy()` - adds to borrowed set, validates limit
+  - `returnCopy()` - removes from borrowed set
+  - `canBorrowMore()` - checks against MAX_BORROW_LIMIT
+- **MUST NOT**:
+  - Allocate copies from inventory
+  - Release copies to inventory
+  - Change copy state
+  - Know how inventory works
 
-### `UserRegistry` (Registry)
-- **Responsibility**: Manages user data
-- **Key Concepts**: SRP
-- **Operations**: `registerUser()`, `getUser()`, `userExists()`
-
-### `IssueRegistry` (Registry)
-- **Responsibility**: Tracks active issue records
-- **Key Concepts**: SRP, Transaction tracking
-- **Operations**: `recordIssue()`, `recordReturn()`, `getActiveIssue()`
+### `Library` (Orchestrator)
+- **Responsibility**: Central coordinator ensuring atomic operations
+- **Key Principles**: Transaction management, Orchestration
+- **Owns**: User registry
+- **Coordinates**:
+  - User validation
+  - Inventory allocation
+  - Borrow / return workflows
+- **Ensures**:
+  - Atomic operations
+  - No inconsistent state
+  - Proper object interaction
+  - **Rollback on failures**
+- **Operations**:
+  - `registerUser()`
+  - `borrowBook(userId, bookId)` - atomic with rollback
+  - `returnBook(userId, copy)` - atomic validation
 
 ---
 
 ## 📊 Data Structure Selection (With Justification)
 
-| Use Case | Data Structure | Why |
-|----------|---------------|-----|
+| Purpose | Data Structure | Reason |
+|---------|---------------|--------|
 | **Book lookup** | `HashMap<String, Book>` | O(1) access by bookId |
-| **Copies per book** | `HashMap<String, Set<BookCopy>>` | No duplicate copies, all copies for a book |
-| **Available copies** | `HashMap<String, Deque<BookCopy>>` | Fast allocation (FIFO), O(1) poll/offer |
-| **Users** | `HashMap<String, User>` | Identity lookup O(1) |
-| **User's issued books** | `HashSet<String>` (inside User) | Uniqueness, fast contains() |
-| **Active issues** | `HashMap<String, BookIssueRecord>` | Key: copyId, O(1) return validation |
-| **Issue history** | `ArrayList<BookIssueRecord>` | Append-only, chronological order |
+| **User lookup** | `HashMap<String, User>` | O(1) identity lookup |
+| **All copies per book** | `HashMap<String, HashSet<BookCopy>>` | Track total inventory, prevent duplicates |
+| **Available copies** | `HashMap<String, Deque<BookCopy>>` | O(1) allocate (removeFirst) / return (addLast), FIFO allocation |
+| **User borrowed copies** | `HashSet<BookCopy>` (inside User) | Fast contains/remove, uniqueness |
 
-### Key Design Decisions:
+### Why `Deque<BookCopy>` for availability?
 
-**Why `Deque<BookCopy>` for available copies?**
-- Efficient allocation: `pollFirst()` → O(1)
-- Efficient return: `offerLast()` → O(1)
-- Natural FIFO behavior for copy distribution
+✅ **FIFO allocation** - First available copy is issued first  
+✅ **O(1) operations** - `removeFirst()` and `addLast()`  
+✅ **Models real-world** - Copy circulation pattern  
 
-**Why separate `Set<BookCopy>` and `Deque<BookCopy>`?**
-- Set: All copies (total inventory)
-- Deque: Only available copies (allocation pool)
-- Separation maintains clear state boundaries
-
-**Why `HashMap<String, BookIssueRecord>` keyed by copyId?**
-- Return operation needs: "Who has this copy?"
-- O(1) validation on return
-- Prevents wrong user from returning
+**All collections were chosen based on responsibility, not convenience.**
 
 ---
 
-## 🎨 Design Patterns (Used Judiciously)
+## 🔁 Transaction Safety (Critical)
 
-### ✅ Strategy Pattern (MANDATORY)
-
-**Used for**: Borrowing rules
+### Borrow Operation (Atomic):
 
 ```
-BorrowPolicy (interface)
- ├── StudentBorrowPolicy (max 5 books)
- └── FacultyBorrowPolicy (max 10 books)
+1. Validate user exists
+2. Allocate copy from inventory
+3. Assign copy to user
+   ❌ If step 3 fails → inventory rollback occurs
 ```
 
-**Why this is correct**:
-- ✔ Avoids `if (userType == STUDENT)` conditionals
-- ✔ Open–Closed Principle compliance
-- ✔ Easy to add new user types without modifying Library
-- ✔ Interview-correct usage of Strategy
+### Return Operation (Atomic):
 
-**Implementation**:
-```java
-interface BorrowPolicy {
-    boolean canBorrow(User user);
-    int getMaxBooks();
-}
+```
+1. Validate user owns copy
+2. Remove from user
+3. Release to inventory
 ```
 
-### ❌ Singleton (Deliberately Avoided)
-
-**Why NOT used**:
-- Hard to test
-- Unnecessary global state
-- Better to inject dependencies
-
-### ❌ State Pattern
-
-**Why NOT needed**:
-- Enum-based validation is sufficient
-- Only 2 states: AVAILABLE, ISSUED
-- State Pattern adds unnecessary complexity
+**No operation leaves the system half-updated.**
 
 ---
 
-## ⚠️ Edge Cases & Exception Handling
+## ⚠️ Exception Strategy
 
-### Custom Exception Hierarchy
+- **Only RuntimeExceptions are used**
+- Represent:
+  - Invalid input
+  - Business rule violations
+  - Illegal state transitions
+- **No checked exceptions** in the domain layer
+
+### Exception Hierarchy:
 
 ```
 LibraryException (extends RuntimeException)
@@ -250,151 +256,293 @@ LibraryException (extends RuntimeException)
 └── BookIssuedException
 ```
 
-### Enforced Scenarios
+### Enforced Scenarios:
 
-| Scenario | Protection | Exception |
-|----------|-----------|-----------|
-| Issue unavailable book | Empty Deque check | `BookUnavailableException` |
-| Over-limit borrow | `BorrowPolicy.canBorrow()` | `BorrowLimitExceededException` |
-| Return wrong copy | IssueRegistry validation | `InvalidReturnException` |
-| Remove issued book | Inventory count check | `BookIssuedException` |
-| Duplicate user/book | Registry existence check | `DuplicateEntityException` |
-| Non-existent entity | Registry lookup | `EntityNotFoundException` |
+| Scenario | Exception | When |
+|----------|-----------|------|
+| Borrow unavailable book | `BookUnavailableException` | Empty available queue |
+| Exceed borrow limit | `BorrowLimitExceededException` | User has max copies |
+| Return unowned copy | `InvalidReturnException` | Copy not in user's set |
+| Remove issued book | `BookIssuedException` | Available ≠ Total copies |
+| Duplicate registration | `DuplicateEntityException` | ID already exists |
 
-### Atomic Operations
-
-**Issue Book Flow**:
-1. Validate user exists
-2. Validate book exists
-3. Check policy eligibility
-4. Allocate copy (or fail)
-5. Record issue
-6. Update user's issued books
-
-**If ANY step fails → No state change (rollback)**
-
-**Return Book Flow**:
-1. Validate user exists
-2. Validate copy exists in user's records
-3. Release copy to available pool
-4. Remove from user's issued books
-5. Close issue record
+**Invalid operations fail fast. No silent failures. No partial updates.**
 
 ---
 
-## 💻 Implementation Guide (Correct Order)
+## 🔄 Sequence Diagrams (Runtime Object Interaction)
 
-### Phase 1 – Core Entities
-1. Create **Enums**: `UserType`, `CopyStatus`
-2. Create **Book** (immutable)
-3. Create **BookCopy** (with state transitions)
-4. Create **User** (with issued books tracking)
-5. Create **BookIssueRecord** (transaction object)
+### 1️⃣ Borrow Book Flow (Happy Path)
 
-### Phase 2 – Registries (SRP)
-6. Implement **BookInventory**
-7. Implement **UserRegistry**
-8. Implement **IssueRegistry**
-
-### Phase 3 – Policies (Strategy)
-9. Create `BorrowPolicy` interface
-10. Implement `StudentBorrowPolicy`
-11. Implement `FacultyBorrowPolicy`
-
-### Phase 4 – Library Orchestration
-12. Implement **Library** class
-13. Wire registries and policies
-14. Implement atomic `issueBook()`
-15. Implement atomic `returnBook()`
-
-### Phase 5 – Enhancements
-16. Add **Comparators** for sorting books
-17. Implement search by title/author
-18. Add comprehensive validation
-
----
-
-## 🚀 Future Extensions (Designed In)
-
-| Feature | How to Add | Pattern/Approach |
-|---------|-----------|------------------|
-| **Fines** | `FinePolicy` interface | Strategy pattern |
-| **Reservations** | `PriorityQueue<BookRequest>` | Queue + Policy |
-| **Notifications** | `NotificationService` | Observer pattern |
-| **Persistence** | `Repository` abstraction | Repository pattern |
-| **Multi-library** | `LibraryManager` | Aggregate pattern |
-| **Due dates** | Add `dueDate` to `BookIssueRecord` | Domain enhancement |
-
-### How to Add Fines (OCP Example)
-
-```java
-interface FinePolicy {
-    double calculateFine(BookIssueRecord record);
-}
-
-class PerDayFinePolicy implements FinePolicy {
-    public double calculateFine(BookIssueRecord record) {
-        // Calculate based on overdue days
-    }
-}
 ```
+Client
+  |
+  | borrowBook(userId, bookId)
+  |
+Library
+  |
+  | get user from users map
+  |
+  | allocateCopy(bookId)
+  |
+BookInventory
+  |
+  | check book exists
+  | check availableCopies not empty
+  | remove copy from available queue
+  | issue() on BookCopy
+  | return BookCopy
+  |
+Library
+  |
+  | borrowCopy(copy)
+  |
+User
+  |
+  | validate borrow limit
+  | add copy to borrowedCopies
+  |
+Library
+  |
+  | return BookCopy
+  |
+Client
+```
+
+**Key LLD Takeaways**:
+- Library coordinates everything
+- Inventory owns allocation
+- User owns responsibility
+- No object violates SRP
+
+---
+
+### 2️⃣ Borrow Book Flow (Failure with Rollback)
+
+**Scenario**: User exceeds borrowing limit → allocation must be rolled back.
+
+```
+Client
+  |
+  | borrowBook(userId, bookId)
+  |
+Library
+  |
+  | allocateCopy(bookId)
+  |
+BookInventory
+  |
+  | allocate and issue BookCopy
+  | return BookCopy
+  |
+Library
+  |
+  | borrowCopy(copy)
+  |
+User
+  |
+  | ❌ throw IllegalStateException (limit exceeded)
+  |
+Library
+  |
+  | catch RuntimeException
+  | releaseCopy(copy)
+  |
+BookInventory
+  |
+  | returnCopy() on BookCopy
+  | add copy back to available queue
+  |
+Library
+  |
+  | rethrow exception
+  |
+Client
+```
+
+**Why This Diagram Is IMPORTANT**:
+- Proves atomicity
+- Transaction safety
+- No partial state updates
+- **Interviewers love this**
+
+---
+
+### 3️⃣ Return Book Flow (Happy Path)
+
+```
+Client
+  |
+  | returnBook(userId, copy)
+  |
+Library
+  |
+  | get user
+  | returnCopy(copy)
+  |
+User
+  |
+  | remove copy from borrowedCopies
+  |
+Library
+  |
+  | releaseCopy(copy)
+  |
+BookInventory
+  |
+  | validate copy belongs to inventory
+  | validate state == ISSUED
+  | returnCopy() on BookCopy
+  | add copy back to available queue
+  |
+Library
+  |
+Client
+```
+
+**LLD Observations**:
+- User returns first → prevents invalid inventory release
+- Inventory restores availability
+- State transitions are controlled
+
+---
+
+### 4️⃣ Invalid Return Scenario
+
+**Scenario**: User tries to return a book they never borrowed.
+
+```
+Client
+  |
+  | returnBook(userId, copy)
+  |
+Library
+  |
+  | returnCopy(copy)
+  |
+User
+  |
+  | ❌ throw IllegalStateException (copy not owned)
+  |
+Library
+  |
+  | ❌ stop (inventory NOT touched)
+  |
+Client
+```
+
+**Why This Is Correct**:
+- Inventory state remains untouched
+- No false availability increase
+- Strong invariants preserved
+
+---
+
+### 5️⃣ High-Level Interaction Summary
+
+```
+Client
+   ↓
+Library  ←── orchestrates workflows
+   ↓
+User        BookInventory
+   ↓              ↓
+Borrow state   Availability state
+```
+
+---
+
+## ✅ What Has Been Implemented
+
+✅ **Book** — immutable, identity-safe  
+✅ **BookCopy** — state-aware physical copy  
+✅ **BookInventory** — aggregate root for books/copies  
+✅ **User** — borrowing responsibility with limits  
+✅ **Library** — transactional orchestrator with rollback  
+
+**The system is complete, consistent, and interview-ready.**
+
+---
+
+## 🚀 Future Extensions (Designed-In)
+
+Without changing core logic, the system can be extended with:
+
+| Feature | Design Path |
+|---------|-------------|
+| **Borrowing policies** | Strategy pattern (StudentPolicy, FacultyPolicy) |
+| **Reservations** | Queue-based model with PriorityQueue |
+| **Due dates & fines** | Add to BookIssueRecord + FinePolicy |
+| **Persistence layer** | Repository abstraction |
+| **Multiple libraries** | Higher-level aggregate (LibraryManager) |
+| **Search by title/author** | Iterate or add inverted index |
 
 ---
 
 ## 🎓 What This Project Demonstrates
 
-✅ **Core Java**: Classes, Enums, Exceptions, Constructors, final keyword  
-✅ **OOP**: SRP, OCP, Abstraction, Encapsulation, Polymorphism  
-✅ **Collections**: HashMap, HashSet, Deque, ArrayList (with justification)  
-✅ **DSA inside design**: Hashing (O(1) lookups), Deque operations  
-✅ **LLD thinking**: Ownership, invariants, extensibility, atomic operations  
-✅ **Design Patterns**: Strategy (correctly applied)  
-✅ **Exception Handling**: Custom exceptions, business rule enforcement  
+✅ **Core Java mastery** — `final`, enums, exceptions, collections  
+✅ **Correct OOP modeling** — Encapsulation, Abstraction, SRP  
+✅ **Responsibility ownership** — Clear boundaries, no god classes  
+✅ **Data-driven design** — Structures match access patterns  
+✅ **LLD interview thinking** — Entity modeling, state management  
+✅ **Transaction safety** — Atomic operations with rollback  
+✅ **Real-world system modeling** — Book ≠ BookCopy distinction  
 
 ---
 
 ## 🔥 Interview Takeaway
 
-### If asked: "Why is this design good?"
+### If asked: **"Why is this design good?"**
 
-**You can answer**:
+You can say:
 
-1. ✅ **Clear ownership** – Each registry owns its data
-2. ✅ **No invalid states** – State transitions enforced at entity level
-3. ✅ **Behavior isolated via strategies** – Policies are pluggable
-4. ✅ **Data structures chosen for access patterns** – HashMap for O(1), Deque for allocation
-5. ✅ **Easy to extend without rewriting logic** – OCP compliance via interfaces
-
-### If asked: "Why Strategy Pattern for BorrowPolicy?"
-
-**You can answer**:
-
-- Without it: `if (user.getType() == STUDENT) { max = 5; } else { max = 10; }`
-- With it: Each policy encapsulates its own rules
-- Adding new user type: Just add new policy class, no changes to Library
-- **This is OCP in action**
-
-### If asked: "Why separate Book and BookCopy?"
-
-**You can answer**:
-
-- **Book** = Metadata (title, author) – doesn't change
-- **BookCopy** = Physical instance with state (available/issued)
-- Same book can have 10 copies with different states
-- Issue/return happens at copy level, not book level
-- **This models reality correctly**
+1. ✅ **Each class has one clear responsibility** — SRP enforced strictly
+2. ✅ **State transitions are tightly controlled** — No invalid states possible
+3. ✅ **Inventory consistency is guaranteed** — Aggregate pattern
+4. ✅ **Objects do not overstep boundaries** — User can't touch inventory
+5. ✅ **Design is extensible without refactoring** — OCP via Strategy
+6. ✅ **Data structures match access patterns** — HashMap O(1), Deque O(1)
+7. ✅ **Transaction safety with rollback** — All-or-nothing operations
 
 ---
 
-## 📌 Critical Design Principles Applied
+### If asked: **"Why Book and BookCopy are separate?"**
 
-1. **Single Responsibility** – Each class has ONE reason to change
-2. **Open-Closed** – Open for extension (new policies), closed for modification
-3. **Fail-Fast** – Invalid operations throw exceptions immediately
-4. **Immutability** – Book metadata never changes
-5. **State Encapsulation** – BookCopy manages its own state
-6. **Atomic Operations** – Issue/return are all-or-nothing transactions
+You can say:
+
+- **Book** = Metadata (title, author) — doesn't change, doesn't have state
+- **BookCopy** = Physical instance with lifecycle (AVAILABLE → ISSUED → AVAILABLE)
+- Same book can have 10 copies with **different states**
+- Issue/return happens at **copy level**, not book level
+- **This models reality correctly** — multiple students can't borrow "the same copy"
 
 ---
 
-**Next Step**: Start implementing Phase 1! Begin with enums and core entities. �
+### If asked: **"How do you ensure atomicity?"**
+
+You can say:
+
+```java
+try {
+    BookCopy copy = inventory.allocateCopy(bookId);
+    user.borrowCopy(copy);
+} catch (RuntimeException e) {
+    inventory.releaseCopy(copy); // ROLLBACK
+    throw e;
+}
+```
+
+- If user fails to accept, inventory is rolled back
+- No partial updates
+- System remains consistent
+
+---
+
+### If asked: **"Why Deque for available copies?"**
+
+You can say:
+
+- `removeFirst()` → O(1) allocation (FIFO)
+- `addLast()` → O(1) return
+- Models real library behavior (first available copy issue
