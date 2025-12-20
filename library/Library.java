@@ -14,26 +14,35 @@ public class Library {
 
     private final Map<String, User> users = new HashMap<>(); // Registers users by userId
     private final BookInventory inventory; // Inventory (delegated responsibility)
+    private final BorrowPolicyFactory policyFactory; // Factory to get BorrowPolicy based on UserType
 
-    public Library(BookInventory inventory) {
+    public Library(BookInventory inventory, BorrowPolicyFactory policyFactory){
+        if (policyFactory == null) {
+            throw new IllegalArgumentException("BorrowPolicyFactory cannot be null");
+        }
         if (inventory == null) {
             throw new IllegalArgumentException("BookInventory cannot be null");
         }
         this.inventory=inventory;
+        this.policyFactory=policyFactory;
     }
    
     // Registers a new user into the library system.
-    public void registerUser(String userId, String name){
+    public void registerUser(String userId, String name, UserType userType){
         if(userId==null || userId.isBlank()){
             throw new IllegalArgumentException("User ID cannot be null or blank");
         }
         if(name==null || name.isBlank()){
             throw new IllegalArgumentException("User name cannot be null or blank");
         }
+        if(userType==null){
+            throw new IllegalArgumentException("User type cannot be null");
+        }
         if(users.containsKey(userId)){
             throw new IllegalStateException("User with ID " + userId + " already exists");
         }
-        User user = new User(userId, name);
+
+        User user = new User(userId, name, userType);
         users.put(userId, user);
     }
 
@@ -53,6 +62,13 @@ public class Library {
         if(user==null){
             throw new IllegalStateException("User with ID " + userId + " does not exist registered");
         }
+        
+        // Check borrow policy
+        BorrowPolicy policy = policyFactory.getPolicy(user);
+        if(!policy.canBorrow(user)){
+            throw new IllegalStateException("User with ID " + userId + " has reached the borrow limit of " + policy.getMaxLimit());
+        }
+
         BookCopy copy = null;
         try{
         // Allocate copy from inventory

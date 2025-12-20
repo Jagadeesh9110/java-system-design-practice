@@ -47,4 +47,19 @@ public class BookCopy {
         }
         status = BookCopyStatus.AVAILABLE;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof BookCopy)) return false;
+        BookCopy bookCopy = (BookCopy) o;
+        return copyId.equals(bookCopy.copyId);
+    }
+
+    @Override
+    public int hashCode() {
+        return copyId.hashCode();
+    }
 }
