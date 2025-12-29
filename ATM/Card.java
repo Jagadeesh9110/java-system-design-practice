@@ -1,4 +1,4 @@
-package ATM;
+package atm;
   
 public class Card {
     private final String cardNumber;

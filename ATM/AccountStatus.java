@@ -1,4 +1,4 @@
-package ATM;
+package atm;
 
 public enum AccountStatus {
     ACTIVE,
